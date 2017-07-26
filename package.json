@@ -1,0 +1,12 @@
+{
+  "name": "aa-s3-fetch",
+  "version": "0.0.1",
+  "bin": {
+    "aa-s3-fetch": "aa-s3-fetch"
+  },
+  "dependencies": {
+    "aws-sdk": "2.85.0",
+    "csv-parse": "1.2.1",
+    "sanitize-filename": "1.6.1"
+  }
+}

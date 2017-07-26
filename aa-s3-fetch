@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+
+'use strict';
+
+const csvParseSync = require('csv-parse/lib/sync');
+var sanitize = require("sanitize-filename");
+const fs = require('fs');
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
+
+function handle(error) {
+  console.trace(error);
+}
+
+if (process.argv.length < 3 ||
+  process.argv[2].toLowerCase() === '-h' ||
+  process.argv[2].toLowerCase() === 'h' ||
+  process.argv[2].toLowerCase() === 'help'
+) {
+  console.error(`
+Usage: aa-s3-fetch SPEC_FILE [OUTPUT_FOLDER]
+
+Gets files from Amazon S3.
+
+SPEC_FILE (required) is a CSV file like so.
+
+    "Cloud Documents: Cloud Documents Name","Folder Id"
+    "My Alias Filename1.png","some/not/so/friendly/path/on/s3-a.PNG"
+    "My Alias Filename2.png","some/not/so/friendly/path/on/s3-b.PNG"
+
+OUTPUT_FOLDER (optional) defaults to 'out'
+
+Make sure you have a credentials file like so.
+
+    [default]
+    aws_access_key_id = your_access_key
+    aws_secret_access_key = your_secret_key
+
+The credentials file should be located like so.
+
+    Mac/Linux:  ~/.aws/credentials
+    Windows:    C:\\Users\\USERNAME\\.aws\\credentials
+  `);
+  process.exit(33);
+}
+
+var specFileName = process.argv[2];
+var outputFolderName = process.argv[3] || 'out';
+
+// Reads in a CSV file like this.
+//
+// Name,Address
+// "Billy","323 Park St"
+// "Sally","2935 Washington"
+//
+// And returns array of JSON like this.
+//
+// [ { Name: 'Billy', Address: '323 Park St' },
+//   { Name: 'Sally', Address: '2935 Washington' } ]
+function getFileList(specFile) {
+  return csvParseSync(
+    fs.readFileSync(specFile),
+    { columns: true }
+  );
+}
+
+function fetchFile(alias, s3path) {
+  const pth = './' + outputFolderName + '/' +
+    sanitize(alias, { replacement: '_' });
+  const ws = fs.createWriteStream(pth);
+  s3.getObject(
+    {
+      Bucket: 'achieve-atlanta-salesforce-resources',
+      Key: s3path
+    })
+    .createReadStream()
+    .on('error', function (e) { console.trace(e) })
+    .pipe(ws)
+    .on('error', function (e) { console.trace(e) });
+}
+
+const fileList = getFileList(specFileName);
+
+fileList.forEach(function (spec) {
+  fetchFile(
+    spec['Cloud Documents: Cloud Documents Name'],
+    spec['Folder Id']);
+});
