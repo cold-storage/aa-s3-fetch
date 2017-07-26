@@ -64,7 +64,8 @@ function getFileList(specFile) {
 
 function er(pth, e) {
   console.log(`ERROR: ${pth}`);
-  console.trace(e);
+  // console.trace(e);
+  console.log(`       ${e.message}`);
 }
 
 function ok(pth) {
