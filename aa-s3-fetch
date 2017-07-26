@@ -2,16 +2,14 @@
 
 'use strict';
 
-const csvParseSync = require('csv-parse/lib/sync');
-var sanitize = require("sanitize-filename");
+const parse = require('csv-parse/lib/sync');
+const sanitize = require("sanitize-filename");
 const fs = require('fs');
+const path = require('path');
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 
-function handle(error) {
-  console.trace(error);
-}
-
+// Display help if no arguments passed or if you specifically ask for help.
 if (process.argv.length < 3 ||
   process.argv[2].toLowerCase() === '-h' ||
   process.argv[2].toLowerCase() === 'h' ||
@@ -58,13 +56,33 @@ var outputFolderName = process.argv[3] || 'out';
 // [ { Name: 'Billy', Address: '323 Park St' },
 //   { Name: 'Sally', Address: '2935 Washington' } ]
 function getFileList(specFile) {
-  return csvParseSync(
+  return parse(
     fs.readFileSync(specFile),
     { columns: true }
   );
 }
 
+function er(pth, e) {
+  console.log(`ERROR: ${pth}`);
+  console.trace(e);
+}
+
+function ok(pth) {
+  console.log(`Success: ${pth}`);
+}
+
+// Some of the alias names don't have the extension (.png, .html, etc)
+// Assume we want them or the files will be difficult to work with.
+function addFileExtensionIfNecessary(alias, s3path) {
+  const s3ext = path.extname(s3path);
+  if (s3ext.toLowerCase() !== path.extname(alias).toLowerCase()) {
+    return alias + s3ext;
+  }
+  return alias;
+}
+
 function fetchFile(alias, s3path) {
+  alias = addFileExtensionIfNecessary(alias, s3path);
   const pth = './' + outputFolderName + '/' +
     sanitize(alias, { replacement: '_' });
   const ws = fs.createWriteStream(pth);
@@ -74,9 +92,10 @@ function fetchFile(alias, s3path) {
       Key: s3path
     })
     .createReadStream()
-    .on('error', function (e) { console.trace(e) })
+    .on('error', er.bind(null, pth))
     .pipe(ws)
-    .on('error', function (e) { console.trace(e) });
+    .on('error', er.bind(null, pth))
+    .on('finish', ok.bind(null, pth));
 }
 
 const fileList = getFileList(specFileName);
