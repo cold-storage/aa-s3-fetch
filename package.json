@@ -8,5 +8,9 @@
     "aws-sdk": "2.85.0",
     "csv-parse": "1.2.1",
     "sanitize-filename": "1.6.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/johndstein/aa-s3-fetch.git"
   }
 }
