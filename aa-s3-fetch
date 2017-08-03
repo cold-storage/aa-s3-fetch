@@ -38,6 +38,8 @@ The credentials file should be located like so.
 
     Mac/Linux:  ~/.aws/credentials
     Windows:    C:\\Users\\USERNAME\\.aws\\credentials
+
+Errors will end up in OUTPUT_FOLDER/errors.txt
   `);
   process.exit(33);
 }
@@ -57,19 +59,31 @@ var outputFolderName = process.argv[3] || 'out';
 //   { Name: 'Sally', Address: '2935 Washington' } ]
 function getFileList(specFile) {
   return parse(
-    fs.readFileSync(specFile),
-    { columns: true }
+    fs.readFileSync(specFile), {
+      columns: true
+    }
   );
 }
 
-function er(pth, e) {
-  console.log(`ERROR: ${pth}`);
+let errStream = null;
+
+function er(pth, alias, e) {
+  if (!errStream) {
+    errStream = fs.createWriteStream(
+      path.normalize(
+        path.join(outputFolderName, 'errors.txt')));
+  }
+  let a = `ERROR: ${pth}\n       ${alias}`;
+  let b = `       ${e.message}`
+  console.log(a);
   // console.trace(e);
-  console.log(`       ${e.message}`);
+  console.log(b);
+  errStream.write(a + '\n')
+  errStream.write(b + '\n')
 }
 
 function ok(pth) {
-  console.log(`Success: ${pth}`);
+  // console.log(`Success: ${pth}`);
 }
 
 // Some of the alias names don't have the extension (.png, .html, etc)
@@ -84,24 +98,27 @@ function addFileExtensionIfNecessary(alias, s3path) {
 
 function fetchFile(alias, s3path) {
   alias = addFileExtensionIfNecessary(alias, s3path);
-  const pth = './' + outputFolderName + '/' +
-    sanitize(alias, { replacement: '_' });
+  const pth = path.normalize(
+    path.join(
+      outputFolderName + '/',
+      sanitize(alias, {
+        replacement: '_'
+      })));
   const ws = fs.createWriteStream(pth);
-  s3.getObject(
-    {
+  s3.getObject({
       Bucket: 'achieve-atlanta-salesforce-resources',
       Key: s3path
     })
     .createReadStream()
-    .on('error', er.bind(null, pth))
+    .on('error', er.bind(null, pth, alias))
     .pipe(ws)
-    .on('error', er.bind(null, pth))
+    .on('error', er.bind(null, pth, alias))
     .on('finish', ok.bind(null, pth));
 }
 
 const fileList = getFileList(specFileName);
 
-fileList.forEach(function (spec) {
+fileList.forEach(function(spec) {
   fetchFile(
     spec['Cloud Documents: Cloud Documents Name'],
     spec['Folder Id']);
